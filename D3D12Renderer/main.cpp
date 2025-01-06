@@ -24,17 +24,17 @@ bool                              g_isInitialised = false;
 uint32_t                          g_windowWidth = 1280;
 uint32_t                          g_windowHeight = 720;
 
-HWND                              g_hWnd;
-RECT                              g_windowRect;
+HWND                              g_hWnd;         // Handle to OS window used to display the back buffer.
+RECT                              g_windowRect;   // Used to store previous window dimensions when toggling between windowed and fullscreen modes.
 
 ComPtr<ID3D12Device2>             g_device;
 ComPtr<ID3D12CommandQueue>        g_commandQueue;
 ComPtr<IDXGISwapChain4>           g_swapChain;
-ComPtr<ID3D12Resource>            g_backBuffers[g_numFrames];
-ComPtr<ID3D12GraphicsCommandList> g_commandList;
-ComPtr<ID3D12CommandAllocator>    g_commandAllocators[g_numFrames];
-ComPtr<ID3D12DescriptorHeap>      g_RTVDescriptorHeap;
-UINT                              g_RTVDescriptorSize;
+ComPtr<ID3D12Resource>            g_backBuffers[g_numFrames];         // Pointers to swapchain's back buffer resources
+ComPtr<ID3D12GraphicsCommandList> g_commandList;                      // Used to record GPU commands (like Vulkan's command pool?)
+ComPtr<ID3D12CommandAllocator>    g_commandAllocators[g_numFrames];   // Backing memory for recording GPU commands into command list, one per frame in flight is required.
+ComPtr<ID3D12DescriptorHeap>      g_RTVDescriptorHeap;                // Render target view (RTV) object to describe properties of back buffers. (Descriptor heaps are essentially descriptor sets.)
+UINT                              g_RTVDescriptorSize;                // Size of a single RTV descriptor, used to correctly index into the descriptor heap.
 UINT                              g_currentBackBufferIndex;
 
 ComPtr<ID3D12Fence>               g_fence;
@@ -180,4 +180,79 @@ ComPtr<IDXGIAdapter4> GetAdapter(bool useWarp)
     }
   }
   return dxgiAdapter4;
+}
+
+ComPtr<ID3D12Device2> CreateDevice(ComPtr <IDXGIAdapter4> adapter)
+{
+  ComPtr<ID3D12Device2> d3d12Device2;
+  DX12_CHECK(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3d12Device2)));
+
+#if defined(_DEBUG)
+  // Enable debug messages if in debug mode:
+  ComPtr<ID3D12InfoQueue> pInfoQueue;
+  if (SUCCEEDED(d3d12Device2.As(&pInfoQueue)))
+  {
+    pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+    pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+    pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
+
+    D3D12_MESSAGE_SEVERITY severities[] = {
+      D3D12_MESSAGE_SEVERITY_INFO,
+    };
+
+    D3D12_MESSAGE_ID denyIDs[] = {
+      D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,
+      D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
+      D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,
+    };
+
+    D3D12_INFO_QUEUE_FILTER newFilter = {};
+    newFilter.DenyList.NumCategories = 0;
+    newFilter.DenyList.pCategoryList = nullptr;
+    newFilter.DenyList.NumCategories = _countof(severities);
+    newFilter.DenyList.pSeverityList = severities;
+    newFilter.DenyList.NumIDs = _countof(denyIDs);
+    newFilter.DenyList.pIDList = denyIDs;
+    
+    DX12_CHECK(pInfoQueue->PushStorageFilter(&newFilter));
+  }
+#endif
+
+  return d3d12Device2;
+}
+
+ComPtr<ID3D12CommandQueue> CreateCommandQueue(ComPtr<ID3D12Device2> device, D3D12_COMMAND_LIST_TYPE type)
+{
+  ComPtr<ID3D12CommandQueue> d3d12CommandQueue;
+
+  D3D12_COMMAND_QUEUE_DESC desc = {};
+  desc.Type = type;
+  desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+  desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+  desc.NodeMask = 0;
+
+  DX12_CHECK(device->CreateCommandQueue(&desc, IID_PPV_ARGS(&d3d12CommandQueue)));
+}
+
+bool CheckTearingSupport()
+{
+  BOOL allowTearing = FALSE;
+
+  ComPtr<IDXGIFactory4> factory4;
+  if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory4))))
+  {
+    ComPtr<IDXGIFactory5> factory5;
+
+    if (SUCCEEDED(factory4.As(&factory5)))
+    {
+      if (FAILED(factory5->CheckFeatureSupport(
+        DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+        &allowTearing, sizeof(allowTearing))))
+      {
+        allowTearing = FALSE;
+      }
+    }
+  }
+
+  return allowTearing == TRUE;
 }
