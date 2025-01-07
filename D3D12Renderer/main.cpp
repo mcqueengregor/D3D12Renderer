@@ -509,6 +509,18 @@ void ToggleFullscreen()
 
     ::ShowWindow(g_hWnd, SW_MAXIMIZE);
   }
+  else
+  {
+    ::SetWindowLong(g_hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+    ::SetWindowPos(g_hWnd, HWND_NOTOPMOST,
+      g_windowRect.left,
+      g_windowRect.top,
+      g_windowRect.right - g_windowRect.left,
+      g_windowRect.bottom - g_windowRect.top,
+      SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+    ::ShowWindow(g_hWnd, SW_NORMAL);
+  }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
