@@ -141,9 +141,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="Dx12Headers\d3dx12.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="WinIncludes.h" />
