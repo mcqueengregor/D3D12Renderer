@@ -26,12 +26,59 @@ CommandQueue::~CommandQueue()
 
 Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
 {
-  return Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>();
+  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList;
+
+  if (m_commandAllocatorQueue.empty()
+    && IsFenceComplete(m_commandAllocatorQueue.front().fenceVal))
+  {
+    commandAllocator = m_commandAllocatorQueue.front().commandAllocator;
+    m_commandAllocatorQueue.pop();
+
+    DX12_CHECK(commandAllocator->Reset());
+  }
+  else
+    commandAllocator = CreateCommandAllocator();
+
+  if (!m_commandListQueue.empty())
+  {
+    commandList = m_commandListQueue.front();
+    m_commandListQueue.pop();
+
+    DX12_CHECK(commandList->Reset(commandAllocator.Get(), nullptr));
+  }
+  else
+    commandList = CreateCommandList(commandAllocator);
+
+  DX12_CHECK(commandList->SetPrivateDataInterface(
+    __uuidof(ID3D12CommandAllocator), commandAllocator.Get()));
+
+  return commandList;
 }
 
-uint64_t CommandQueue::ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2>)
+uint64_t CommandQueue::ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList)
 {
-  return 0;
+  commandList->Close();
+
+  ID3D12CommandAllocator* commandAllocator;
+  UINT dataSize = sizeof(commandAllocator);
+  DX12_CHECK(commandList->GetPrivateData(
+    __uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator));
+
+  ID3D12CommandList* const ppCommandLists[] = {
+    commandList.Get(),
+  };
+
+  m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+  uint64_t fenceVal = Signal();
+
+  m_commandAllocatorQueue.emplace(
+    CommandAllocatorEntry{ fenceVal, commandAllocator });
+  m_commandListQueue.push(commandList);
+
+  commandAllocator->Release();
+
+  return fenceVal;
 }
 
 uint64_t CommandQueue::Signal()

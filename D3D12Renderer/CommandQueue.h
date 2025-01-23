@@ -13,7 +13,7 @@ public:
 	virtual ~CommandQueue();
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandList();
-	uint64_t ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2>);
+	uint64_t ExecuteCommandList(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> commandList);
 
 	uint64_t	Signal();
 	bool			IsFenceComplete(uint64_t fenceVal);
