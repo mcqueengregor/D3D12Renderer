@@ -5,5 +5,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY $(CMAKE_BINARY_DIR)/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY $(CMAKE_BINARY_DIR)/binary)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY $(CMAKE_BINARY_DIR)/binary)
 
-project(Dx12 
+project("Dx12" 
 LANGUAGES CXX)
+
+add_subdirectory(D3d12Renderer)
+
+set_directory_properties(PROPERTIES
+	VS_STARTUP_PROJECT Dx12Renderer)

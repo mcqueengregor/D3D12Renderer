@@ -399,7 +399,7 @@ void Update()
     char buffer[500];
     auto fps = frameCount / elapsedSecs;
     sprintf_s(buffer, 500, "FPS: %f\n", fps);
-    OutputDebugString((LPCWSTR)buffer);
+    OutputDebugString((LPCSTR)buffer);
   }
 }
 
